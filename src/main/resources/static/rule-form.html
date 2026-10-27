@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pronto Rule Editor</title>
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="/dashboard">Pronto</a>
+  <nav>
+    <a href="/dashboard" aria-current="page">Rules</a>
+    <a href="/dashboard/templates">Templates</a>
+    <a href="/demo">Demo</a>
+  </nav>
+</header>
+<main>
+  <div class="page-head">
+    <div>
+      <h1 id="heading">New rule</h1>
+      <p class="muted">A SpEL boolean over the facts on the right. It is dry-run before saving and takes effect on
+        the next decision.</p>
+    </div>
+  </div>
+  <div id="message" class="alert error" role="alert" hidden></div>
+  <div class="two-col">
+    <form id="rule-form" class="card" novalidate>
+      <div class="grid">
+        <div class="field">
+          <label for="name">Name</label>
+          <input id="name" type="text" maxlength="100" required placeholder="SMALL_CART_BLOCK">
+        </div>
+        <div class="field">
+          <label for="priority">Priority (lower runs first)</label>
+          <input id="priority" type="number" required value="50">
+        </div>
+        <div class="field">
+          <label for="action">Action when it matches</label>
+          <select id="action">
+            <option value="BLOCK">BLOCK</option>
+            <option value="ALLOW">ALLOW</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label for="description">Description</label>
+        <input id="description" type="text" maxlength="500">
+      </div>
+      <div class="field">
+        <label for="expression">Expression</label>
+        <textarea id="expression" class="code" maxlength="1000" spellcheck="false"
+                  placeholder="variables['cartValue'] != null and variables['cartValue'] < 199"></textarea>
+      </div>
+      <div class="field">
+        <label class="inline"><input id="enabled" type="checkbox" checked> Enabled</label>
+      </div>
+      <div id="validation" class="alert" role="status" hidden></div>
+      <div class="form-actions">
+        <button id="validate" type="button" class="button">Validate</button>
+        <button type="submit" class="button primary">Save</button>
+        <a class="button" href="/dashboard">Cancel</a>
+      </div>
+    </form>
+    <aside class="card">
+      <h2 style="margin-top:0">Facts</h2>
+      <table>
+        <tbody>
+        <tr><td><code>user.id</code> <code>user.name</code> <code>user.timezone</code> <code>user.city</code> <code>user.hubId</code> <code>user.orderCount</code></td><td>profile</td></tr>
+        <tr><td><code>message.type</code> <code>message.templateCode</code> <code>message.campaignCode</code></td><td>campaignCode may be null</td></tr>
+        <tr><td><code>variables['key']</code></td><td>request variables, may be null</td></tr>
+        <tr><td><code>localHour</code> <code>localDayOfWeek</code></td><td>0-23, MONDAY..SUNDAY in the user's timezone</td></tr>
+        <tr><td><code>marketingSentToday</code></td><td>marketing sent since local midnight</td></tr>
+        <tr><td><code>hoursSinceLastSameCampaign</code> <code>hoursSinceLastMarketing</code></td><td>1e9 if never</td></tr>
+        </tbody>
+      </table>
+      <h2>Examples</h2>
+      <p><code>localHour &gt;= 22 or localHour &lt; 8</code></p>
+      <p><code>{1,2}.contains(user.hubId) and marketingSentToday &gt;= 2</code></p>
+      <p><code>variables['cartValue'] != null and variables['cartValue'] &lt; 199</code></p>
+      <p><code>variables['tier'] == 'GOLD'</code></p>
+      <h2>Notes</h2>
+      <ul class="muted">
+        <li>Null-guard optional variables: SpEL treats <code>null &lt; 199</code> as true.</li>
+        <li>Methods allowed: contains, containsKey, startsWith, endsWith, equals, equalsIgnoreCase, isEmpty, size,
+          length, toLowerCase, toUpperCase, trim.</li>
+        <li>No <code>T()</code>, <code>new</code>, bean references or assignment.</li>
+      </ul>
+    </aside>
+  </div>
+</main>
+<script src="/app.js"></script>
+<script>
+  'use strict';
+  const id = new URLSearchParams(location.search).get('id');
+  const form = document.getElementById('rule-form');
+  const message = document.getElementById('message');
+  const validation = document.getElementById('validation');
+  const field = name => document.getElementById(name);
+  let version = null;
+
+  async function load() {
+    if (!id) return;
+    field('heading').textContent = 'Edit rule';
+    try {
+      const rule = await api('GET', '/api/v1/rules/' + encodeURIComponent(id));
+      field('name').value = rule.name;
+      field('priority').value = rule.priority;
+      field('action').value = rule.action;
+      field('description').value = rule.description || '';
+      field('expression').value = rule.expression;
+      field('enabled').checked = rule.enabled;
+      version = rule.version;
+      if (rule.systemRule) {
+        field('heading').textContent = 'Edit system rule ' + rule.name;
+        field('enabled').disabled = true;
+      }
+    } catch (error) {
+      showError(message, error);
+    }
+  }
+
+  field('validate').addEventListener('click', async () => {
+    try {
+      const result = await api('POST', '/api/v1/rules/validate', { expression: field('expression').value });
+      if (result.valid) showOk(validation, 'Valid: compiles and returns a boolean.');
+      else showError(validation, { message: result.error, data: { code: 'Invalid' } });
+    } catch (error) {
+      showError(validation, error);
+    }
+  });
+
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    const body = {
+      name: field('name').value.trim(),
+      priority: field('priority').value === '' ? null : Number(field('priority').value),
+      action: field('action').value,
+      description: field('description').value.trim() || null,
+      expression: field('expression').value,
+      enabled: field('enabled').checked,
+      version
+    };
+    try {
+      if (id) await api('PUT', '/api/v1/rules/' + encodeURIComponent(id), body);
+      else await api('POST', '/api/v1/rules', body);
+      location.href = '/dashboard';
+    } catch (error) {
+      showError(message, error);
+      window.scrollTo(0, 0);
+    }
+  });
+
+  load();
+</script>
+</body>
+</html>

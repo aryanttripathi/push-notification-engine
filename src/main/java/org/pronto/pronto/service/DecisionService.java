@@ -33,12 +33,14 @@ import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 /** Decides whether a templated push may be sent to a user, and records the decision and the sent message. */
@@ -60,12 +62,25 @@ public class DecisionService {
     private final TemplateRenderer templateRenderer;
     private final RuleEngine ruleEngine;
     private final ObjectMapper objectMapper;
+    private final Clock clock;
 
+    /** API path: "now" is read after the user lock, so a later-locked request never decides in the past. */
+    @Transactional
+    public DecisionResponse decide(DecideRequest request) {
+        return decideAfterLock(request, clock::instant);
+    }
+
+    /** Explicit "now" for the demo and tests. */
     @Transactional
     public DecisionResponse decide(DecideRequest request, Instant now) {
+        return decideAfterLock(request, () -> now);
+    }
+
+    private DecisionResponse decideAfterLock(DecideRequest request, Supplier<Instant> clockAfterLock) {
         Map<String, Object> variables = request.getVariables() == null ? Map.of() : request.getVariables();
         String variablesJson = variablesJson(variables);
         User user = lockUser(request.getUserId());
+        Instant now = clockAfterLock.get();
         Optional<DecisionResponse> replay = findReplay(request, user);
         if (replay.isPresent()) {
             return replay.get();
@@ -85,21 +100,25 @@ public class DecisionService {
 
     @Transactional(readOnly = true)
     public List<DecisionResponse> decisions(Long userId, int limit) {
-        List<NotificationDecision> decisions =
-                decisionRepository.findByUser_IdOrderByDecidedAtDescIdDesc(userId, Limit.of(limit));
-        if (decisions.isEmpty()) {
-            return List.of();
-        }
-        Map<Long, Notification> byDecisionId = notificationRepository
-                .findByDecision_IdIn(decisions.stream().map(NotificationDecision::getId).toList())
-                .stream()
-                .collect(Collectors.toMap(n -> n.getDecision().getId(), Function.identity()));
-        return decisions.stream().map(d -> toResponse(d, byDecisionId.get(d.getId()))).toList();
+        return withNotifications(decisionRepository.findByUser_IdOrderByDecidedAtDescIdDesc(userId, Limit.of(limit)));
     }
 
     @Transactional(readOnly = true)
     public List<SentNotificationResponse> sent(Long userId, int limit) {
         return notificationRepository.findByUser_IdOrderBySentAtDescIdDesc(userId, Limit.of(limit)).stream()
+                .map(DecisionService::toSentResponse)
+                .toList();
+    }
+
+    /** Latest rows across all users, newest first (demo data dump). */
+    @Transactional(readOnly = true)
+    public List<DecisionResponse> latestDecisions(int limit) {
+        return withNotifications(decisionRepository.findAllByOrderByIdDesc(Limit.of(limit)));
+    }
+
+    @Transactional(readOnly = true)
+    public List<SentNotificationResponse> latestSent(int limit) {
+        return notificationRepository.findAllByOrderByIdDesc(Limit.of(limit)).stream()
                 .map(DecisionService::toSentResponse)
                 .toList();
     }
@@ -181,9 +200,20 @@ public class DecisionService {
         String json = toJson(variables);
         if (StringUtils.length(json) > MAX_VARIABLES_JSON) {
             throw new BadRequestException(VARIABLES_TOO_LONG,
-                    "variables are " + json.length() + " characters as JSON, max " + MAX_VARIABLES_JSON);
+                    "variables are " + StringUtils.length(json) + " characters as JSON, max " + MAX_VARIABLES_JSON);
         }
         return json;
+    }
+
+    private List<DecisionResponse> withNotifications(List<NotificationDecision> decisions) {
+        if (decisions.isEmpty()) {
+            return List.of();
+        }
+        Map<Long, Notification> byDecisionId = notificationRepository
+                .findByDecision_IdIn(decisions.stream().map(NotificationDecision::getId).toList())
+                .stream()
+                .collect(Collectors.toMap(n -> n.getDecision().getId(), Function.identity()));
+        return decisions.stream().map(d -> toResponse(d, byDecisionId.get(d.getId()))).toList();
     }
 
     private DecisionResponse toResponse(NotificationDecision decision, Notification notification) {

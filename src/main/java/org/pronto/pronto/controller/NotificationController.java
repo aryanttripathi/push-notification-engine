@@ -15,7 +15,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.time.Clock;
 import java.util.List;
 
 @RestController
@@ -27,12 +26,11 @@ public class NotificationController {
     private static final int MAX_LIMIT = 500;
 
     private final DecisionService decisionService;
-    private final Clock clock;
 
     /** BLOCKED is still a 200: the request was valid, the answer is "no". */
     @PostMapping("/decide")
     public DecisionResponse decide(@Valid @RequestBody DecideRequest request) {
-        return decisionService.decide(request, clock.instant());
+        return decisionService.decide(request);
     }
 
     @GetMapping("/decisions")

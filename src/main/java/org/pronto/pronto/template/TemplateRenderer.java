@@ -23,6 +23,8 @@ public class TemplateRenderer {
     public static final String USER_NAME = "user_name";
     public static final String USER_CITY = "user_city";
     public static final String USER_ID = "user_id";
+    /** Filled from the DB for every render; callers never send these. */
+    public static final Set<String> SYSTEM_VARIABLES = Set.of(USER_NAME, USER_CITY, USER_ID);
     public static final String RENDERED_MESSAGE_TOO_LONG = "RENDERED_MESSAGE_TOO_LONG";
 
     private static final Pattern PLACEHOLDER = Pattern.compile("\\{\\{\\s*([A-Za-z0-9_]+)\\s*\\}\\}");

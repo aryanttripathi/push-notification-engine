@@ -4,6 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.pronto.pronto.dto.ErrorResponse;
 import org.springframework.context.MessageSourceResolvable;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -36,13 +37,19 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(ConflictException.class)
     public ResponseEntity<ErrorResponse> conflict(ConflictException e) {
-        return reject(HttpStatus.CONFLICT, error(CONFLICT, e.getMessage()));
+        return reject(HttpStatus.CONFLICT, error(e.getCode(), e.getMessage()));
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ErrorResponse> dataConflict(DataIntegrityViolationException e) {
         log.warn("data integrity violation cause={}", e.getMostSpecificCause().getMessage());
         return reject(HttpStatus.CONFLICT, error(CONFLICT, "request conflicts with existing data"));
+    }
+
+    /** Two editors saved the same rule at once; the version check in RuleService covers the common case. */
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    public ResponseEntity<ErrorResponse> staleVersion(OptimisticLockingFailureException e) {
+        return reject(HttpStatus.CONFLICT, error(CONFLICT, "the record was changed by someone else; reload and retry"));
     }
 
     @ExceptionHandler(InvalidRuleException.class)

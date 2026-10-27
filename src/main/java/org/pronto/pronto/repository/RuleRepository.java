@@ -10,5 +10,7 @@ public interface RuleRepository extends JpaRepository<Rule, Long> {
 
     List<Rule> findByEnabledTrueOrderByPriorityAscIdAsc();
 
+    List<Rule> findAllByOrderByPriorityAscIdAsc();
+
     Optional<Rule> findByName(String name);
 }

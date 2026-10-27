@@ -69,7 +69,7 @@ public class NotificationFacts {
     /** DB-free facts with empty variables, used to dry-run an expression before it is saved. */
     public static NotificationFacts stub() {
         UserFacts user = UserFacts.builder()
-                .id(0L).name(STUB_TEXT).timezone(ZoneOffset.UTC.getId()).city(STUB_TEXT).hubId(0L).orderCount(0)
+                .id(0L).name(STUB_TEXT).timezone(ZoneOffset.UTC.getId()).city(STUB_TEXT).hubId(0).orderCount(0)
                 .build();
         MessageFacts message = MessageFacts.builder()
                 .type(MessageType.MARKETING.name()).templateCode(STUB_TEMPLATE_CODE)

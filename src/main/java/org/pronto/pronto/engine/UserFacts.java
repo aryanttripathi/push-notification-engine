@@ -12,7 +12,8 @@ public class UserFacts {
     String name;
     String timezone;
     String city;
-    Long hubId;
+    /** Integer, so `{1,2}.contains(user.hubId)` matches SpEL's Integer list literals. */
+    Integer hubId;
     int orderCount;
 
     static UserFacts from(User user) {
@@ -21,7 +22,7 @@ public class UserFacts {
                 .name(user.getName())
                 .timezone(user.getTimezone())
                 .city(user.getCity())
-                .hubId(user.getHubId())
+                .hubId(user.getHubId() == null ? null : Math.toIntExact(user.getHubId()))
                 .orderCount(user.getOrderCount())
                 .build();
     }

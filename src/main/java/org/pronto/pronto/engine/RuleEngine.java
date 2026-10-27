@@ -3,8 +3,10 @@ package org.pronto.pronto.engine;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.pronto.pronto.entity.Decision;
 import org.pronto.pronto.entity.Rule;
+import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -29,6 +31,7 @@ public class RuleEngine {
             try {
                 matched = compiler.matches(rule, facts);
             } catch (RuntimeException e) {
+                rethrowDatabaseFailure(e);
                 String error = StringUtils.abbreviate(
                         StringUtils.defaultIfBlank(e.getMessage(), e.getClass().getSimpleName()), MAX_ERROR_LENGTH);
                 log.warn("rule failed, blocking ruleId={} rule={} error={}", rule.getId(), rule.getName(), error);
@@ -42,6 +45,18 @@ public class RuleEngine {
             }
         }
         return EvaluationResult.builder().decision(Decision.ALLOWED).reason(DEFAULT_ALLOW).trace(trace).build();
+    }
+
+    /**
+     * A DB failure while loading a lazy fact is not a rule fault: it fails the request (500, rollback, nothing
+     * stored). SpEL wraps getter exceptions, so the cause chain is searched. Everything else a rule throws (SpEL
+     * errors, or e.g. an NPE from an allowlisted method) is the rule's fault and blocks.
+     */
+    private static void rethrowDatabaseFailure(RuntimeException e) {
+        DataAccessException databaseFailure = ExceptionUtils.throwableOfType(e, DataAccessException.class);
+        if (databaseFailure != null) {
+            throw databaseFailure;
+        }
     }
 
     private static Decision decisionFor(Rule rule) {

@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pronto Rules</title>
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="/dashboard">Pronto</a>
+  <nav>
+    <a href="/dashboard" aria-current="page">Rules</a>
+    <a href="/dashboard/templates">Templates</a>
+    <a href="/demo">Demo</a>
+  </nav>
+</header>
+<main>
+  <div class="page-head">
+    <div>
+      <h1>Rules</h1>
+      <p class="muted">Run for MARKETING messages, lowest priority first. The first match decides, no match allows,
+        and a rule that errors blocks. TRANSACTIONAL messages always pass.</p>
+    </div>
+    <a class="button primary" href="/dashboard/new">New rule</a>
+  </div>
+  <div id="message" class="alert error" role="alert" hidden></div>
+  <div class="table-wrap">
+    <table id="rules">
+      <thead>
+      <tr><th>Priority</th><th>Name</th><th>Expression</th><th>Action</th><th>Enabled</th><th></th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</main>
+<script src="/app.js"></script>
+<script>
+  'use strict';
+  const tbody = document.querySelector('#rules tbody');
+  const message = document.getElementById('message');
+
+  async function load() {
+    try {
+      const rules = await api('GET', '/api/v1/rules');
+      tbody.replaceChildren(...rules.map(row));
+      if (!rules.length) tbody.append(el('tr', {}, el('td', { colspan: 6, className: 'muted' }, 'No rules yet.')));
+    } catch (error) {
+      showError(message, error);
+    }
+  }
+
+  function row(rule) {
+    const toggle = el('input', { type: 'checkbox', checked: rule.enabled, 'aria-label': 'Enabled ' + rule.name,
+      disabled: rule.systemRule, title: rule.systemRule ? 'System rules stay enabled; edit them instead' : null });
+    toggle.addEventListener('change', () => setEnabled(rule, toggle));
+    return el('tr', { className: rule.enabled ? null : 'disabled' },
+      el('td', { className: 'num' }, rule.priority),
+      el('td', {},
+        el('strong', {}, rule.name),
+        rule.systemRule ? el('span', { className: 'badge' }, 'system') : null,
+        rule.description ? el('div', { className: 'muted small' }, rule.description) : null),
+      el('td', { className: 'wrap' }, el('code', {}, rule.expression)),
+      el('td', {}, el('span', { className: 'pill ' + (rule.action === 'BLOCK' ? 'block' : 'allow') }, rule.action)),
+      el('td', {}, toggle),
+      el('td', { className: 'actions' },
+        el('a', { className: 'button small', href: '/dashboard/new?id=' + encodeURIComponent(rule.id) }, 'Edit'),
+        ' ',
+        rule.systemRule ? null : el('button', { className: 'button small danger', onclick: () => remove(rule) }, 'Delete')));
+  }
+
+  async function setEnabled(rule, toggle) {
+    toggle.disabled = true;
+    try {
+      await api('PUT', '/api/v1/rules/' + encodeURIComponent(rule.id), {
+        name: rule.name, description: rule.description, priority: rule.priority, expression: rule.expression,
+        action: rule.action, enabled: toggle.checked, version: rule.version
+      });
+      hideMessage(message);
+    } catch (error) {
+      showError(message, error);
+    }
+    await load();
+  }
+
+  async function remove(rule) {
+    if (!confirm('Delete rule ' + rule.name + '?')) return;
+    try {
+      await api('DELETE', '/api/v1/rules/' + encodeURIComponent(rule.id));
+      hideMessage(message);
+    } catch (error) {
+      showError(message, error);
+    }
+    await load();
+  }
+
+  load();
+</script>
+</body>
+</html>

@@ -13,5 +13,7 @@ public interface NotificationDecisionRepository extends JpaRepository<Notificati
 
     List<NotificationDecision> findByUser_IdOrderByDecidedAtDescIdDesc(Long userId, Limit limit);
 
+    List<NotificationDecision> findAllByOrderByIdDesc(Limit limit);
+
     long countByUser_Id(Long userId);
 }

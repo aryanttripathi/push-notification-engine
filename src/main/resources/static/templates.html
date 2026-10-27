@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pronto Templates</title>
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="/dashboard">Pronto</a>
+  <nav>
+    <a href="/dashboard">Rules</a>
+    <a href="/dashboard/templates" aria-current="page">Templates</a>
+    <a href="/demo">Demo</a>
+  </nav>
+</header>
+<main>
+  <div class="page-head">
+    <div>
+      <h1>Templates</h1>
+      <p class="muted">Placeholders use <code>{{name}}</code>. <code>user_name</code>, <code>user_city</code> and
+        <code>user_id</code> come from the user record; callers send the rest as <code>variables</code>.</p>
+    </div>
+  </div>
+  <div id="message" class="alert error" role="alert" hidden></div>
+  <div class="table-wrap">
+    <table id="templates">
+      <thead>
+      <tr><th>Code</th><th>Type</th><th>Campaign</th><th>Title</th><th>Body</th><th>Deep link</th><th>Caller sends</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <h2>New template</h2>
+  <form id="template-form" class="card" novalidate>
+    <div class="grid">
+      <div class="field">
+        <label for="code">Code</label>
+        <input id="code" type="text" maxlength="64" placeholder="CART_REMINDER">
+      </div>
+      <div class="field">
+        <label for="type">Type</label>
+        <select id="type">
+          <option value="MARKETING">MARKETING</option>
+          <option value="TRANSACTIONAL">TRANSACTIONAL</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="campaign">Campaign (dedupe key)</label>
+        <select id="campaign"><option value="">none</option></select>
+      </div>
+    </div>
+    <div class="field">
+      <label for="title">Title</label>
+      <input id="title" type="text" maxlength="200" placeholder="Hi {{user_name}}, you left items in your cart">
+    </div>
+    <div class="field">
+      <label for="body">Body</label>
+      <textarea id="body" maxlength="1000" placeholder="Complete your order of {{item_count}} items."></textarea>
+    </div>
+    <div class="field">
+      <label for="deepLink">Deep link</label>
+      <input id="deepLink" type="text" maxlength="500" placeholder="app://cart">
+    </div>
+    <div id="form-message" class="alert error" role="alert" hidden></div>
+    <div class="form-actions">
+      <button type="submit" class="button primary">Create template</button>
+      <span class="muted small">New campaigns: <code>POST /api/v1/campaigns</code></span>
+    </div>
+  </form>
+</main>
+<script src="/app.js"></script>
+<script>
+  'use strict';
+  const tbody = document.querySelector('#templates tbody');
+  const message = document.getElementById('message');
+  const formMessage = document.getElementById('form-message');
+  const field = name => document.getElementById(name);
+
+  async function load() {
+    try {
+      const [templates, campaigns] = await Promise.all([api('GET', '/api/v1/templates'), api('GET', '/api/v1/campaigns')]);
+      tbody.replaceChildren(...templates.map(row));
+      field('campaign').replaceChildren(el('option', { value: '' }, 'none'),
+        ...campaigns.map(c => el('option', { value: c.code }, c.code + ' (' + c.name + ')')));
+    } catch (error) {
+      showError(message, error);
+    }
+  }
+
+  function row(t) {
+    return el('tr', {},
+      el('td', {}, el('strong', {}, t.code)),
+      el('td', {}, el('span', { className: 'pill ' + (t.type === 'MARKETING' ? 'block' : 'allow') }, t.type)),
+      el('td', {}, t.campaignCode || ''),
+      el('td', { className: 'wrap' }, t.title),
+      el('td', { className: 'wrap' }, t.body),
+      el('td', { className: 'wrap mono small' }, t.deepLink || ''),
+      el('td', { className: 'chips' }, t.requiredVariables.map(v => el('code', {}, v))));
+  }
+
+  document.getElementById('template-form').addEventListener('submit', async event => {
+    event.preventDefault();
+    const body = {
+      code: field('code').value.trim(),
+      type: field('type').value,
+      campaignCode: field('campaign').value || null,
+      title: field('title').value,
+      body: field('body').value,
+      deepLink: field('deepLink').value.trim() || null
+    };
+    try {
+      await api('POST', '/api/v1/templates', body);
+      event.target.reset();
+      showOk(formMessage, 'Template ' + body.code + ' created.');
+      await load();
+    } catch (error) {
+      showError(formMessage, error);
+    }
+  });
+
+  load();
+</script>
+</body>
+</html>

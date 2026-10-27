@@ -149,6 +149,27 @@ class DecisionServiceTest {
     }
 
     @Test
+    void allowlistedMethodsAndIntegerHubIdWorkAtRuntime() {
+        ruleRepository.save(rule("HUB_1_2_BENGALURU", 1,
+                "{1,2}.contains(user.hubId) and user.city.startsWith('Ben')", RuleAction.BLOCK));
+        User otherHub = user(KOLKATA);
+        otherHub.setHubId(3L);
+
+        assertBlocked(newArrivals(newUser(KOLKATA), DAY, "12:00"), "HUB_1_2_BENGALURU");
+        assertThat(newArrivals(userRepository.save(otherHub), DAY, "12:00").getDecision())
+                .isEqualTo(Decision.ALLOWED);
+    }
+
+    @Test
+    void methodOutsideTheAllowlistFailsClosedAtRuntime() {
+        ruleRepository.save(rule("REPEAT", 1, "user.name.repeat(2).length() > 1", RuleAction.BLOCK));
+
+        DecisionResponse response = newArrivals(newUser(KOLKATA), DAY, "12:00");
+        assertThat(response.getDecision()).isEqualTo(Decision.BLOCKED);
+        assertThat(response.getReason()).startsWith(RuleEngine.RULE_ERROR + ": REPEAT");
+    }
+
+    @Test
     void nullGuardedVariableRuleOnlyMatchesWhenPresent() {
         ruleRepository.save(rule("SMALL_CART", 5,
                 "variables['cartValue'] != null and variables['cartValue'] < 199", RuleAction.BLOCK));

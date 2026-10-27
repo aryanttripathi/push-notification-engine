@@ -32,5 +32,7 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
 
     List<Notification> findByUser_IdOrderBySentAtDescIdDesc(Long userId, Limit limit);
 
+    List<Notification> findAllByOrderByIdDesc(Limit limit);
+
     long countByUser_Id(Long userId);
 }

@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pronto Demo</title>
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="/dashboard">Pronto</a>
+  <nav>
+    <a href="/dashboard">Rules</a>
+    <a href="/dashboard/templates">Templates</a>
+    <a href="/demo" aria-current="page">Demo</a>
+  </nav>
+</header>
+<main>
+  <div class="page-head">
+    <div>
+      <h1>Demo scenario</h1>
+      <p class="muted">Creates a fresh user in Asia/Kolkata and replays two days of notifications through the real
+        decision path, starting two days ago. Safe to re-run.</p>
+    </div>
+    <button id="run" class="button primary">Run scenario</button>
+  </div>
+  <div id="message" class="alert error" role="alert" hidden></div>
+  <div id="summary" class="summary" hidden></div>
+  <div id="steps-wrap" class="table-wrap" hidden>
+    <table>
+      <thead>
+      <tr><th>#</th><th>Local time</th><th>Action</th><th>Expected</th><th>Actual</th><th>Result</th><th>Rendered message</th><th>Rows</th></tr>
+      </thead>
+      <tbody id="steps"></tbody>
+    </table>
+  </div>
+  <div id="data"></div>
+</main>
+<script src="/app.js"></script>
+<script>
+  'use strict';
+  const message = document.getElementById('message');
+  const runButton = document.getElementById('run');
+  const TABLES = [['users', 'Users'], ['campaigns', 'Campaigns'], ['templates', 'Templates'], ['rules', 'Rules'],
+    ['decisions', 'Decisions (last 100)'], ['notifications', 'Sent notifications (last 100)']];
+
+  runButton.addEventListener('click', async () => {
+    runButton.disabled = true;
+    hideMessage(message);
+    try {
+      showRun(await api('POST', '/api/v1/demo/run'));
+      await loadData();
+    } catch (error) {
+      showError(message, error);
+    } finally {
+      runButton.disabled = false;
+    }
+  });
+
+  function showRun(run) {
+    const summary = document.getElementById('summary');
+    summary.replaceChildren(
+      el('span', { className: 'pill ' + (run.allPassed ? 'pass' : 'fail') }, run.allPassed ? 'ALL PASSED' : 'FAILURES'),
+      el('strong', {}, run.passed + ' / ' + run.total + ' steps passed'),
+      el('span', { className: 'muted' }, 'demo user ' + run.userName + ' (id ' + run.userId + ')'));
+    summary.hidden = false;
+    document.getElementById('steps').replaceChildren(...run.steps.map(stepRow));
+    document.getElementById('steps-wrap').hidden = false;
+  }
+
+  function stepRow(step) {
+    const vars = step.variables && Object.keys(step.variables).length ? JSON.stringify(step.variables) : null;
+    const rows = [];
+    if (step.decisionId) rows.push('decision #' + step.decisionId);
+    if (step.notificationId) rows.push('notification #' + step.notificationId);
+    if (step.rowId) rows.push('row #' + step.rowId);
+    return el('tr', {},
+      el('td', { className: 'num' }, step.number),
+      el('td', { className: 'mono small' }, step.localTime || ''),
+      el('td', { className: 'wrap' }, step.action,
+        vars ? el('div', {}, el('code', {}, vars)) : null,
+        step.note ? el('div', { className: 'muted small' }, step.note) : null),
+      el('td', { className: 'wrap' }, step.expected),
+      el('td', { className: 'wrap' }, step.actual),
+      el('td', {}, el('span', { className: 'pill ' + (step.passed ? 'pass' : 'fail') }, step.passed ? 'PASS' : 'FAIL')),
+      el('td', { className: 'wrap' }, step.message
+        ? [el('strong', {}, step.message.title), el('div', {}, step.message.body)] : ''),
+      el('td', { className: 'small' }, rows.join(', ')));
+  }
+
+  async function loadData() {
+    try {
+      const data = await api('GET', '/api/v1/demo/data');
+      document.getElementById('data').replaceChildren(...TABLES.map(([key, label]) => dataTable(label, data[key])));
+    } catch (error) {
+      showError(message, error);
+    }
+  }
+
+  function dataTable(label, rows) {
+    const columns = rows.length ? Object.keys(rows[0]) : [];
+    return el('section', {},
+      el('h2', {}, label + ' (' + rows.length + ')'),
+      el('div', { className: 'table-wrap' },
+        el('table', {},
+          el('thead', {}, el('tr', {}, columns.map(c => el('th', {}, c)))),
+          el('tbody', {}, rows.map(r => el('tr', {}, columns.map(c => el('td', { className: 'small' }, cellText(r[c])))))))));
+  }
+
+  loadData();
+</script>
+</body>
+</html>
