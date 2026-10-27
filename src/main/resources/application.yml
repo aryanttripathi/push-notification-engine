@@ -1,0 +1,43 @@
+spring:
+  application:
+    name: pronto
+
+  # Default profile: zero-setup H2 file DB in MySQL mode. Prod uses the `mysql` profile.
+  datasource:
+    url: jdbc:h2:file:./data/pronto;MODE=MySQL;DATABASE_TO_LOWER=TRUE;AUTO_SERVER=TRUE;LOCK_TIMEOUT=10000
+    username: sa
+    password: ""
+
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+  flyway:
+    locations: classpath:db/migration,classpath:db/sample
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+        type:
+          # Instant -> plain DATETIME(6) in UTC on both H2 and MySQL.
+          preferred_instant_jdbc_type: TIMESTAMP
+
+logging:
+  file:
+    name: logs/pronto.log
+  logback:
+    rollingpolicy:
+      max-file-size: 10MB
+      max-history: 7
+      total-size-cap: 70MB
+  pattern:
+    level: "%5p [%X{requestId:-}]"
+  level:
+    # preferred_instant_jdbc_type is flagged "incubating" on every boot; the setting is intended.
+    org.hibernate.orm.incubating: ERROR

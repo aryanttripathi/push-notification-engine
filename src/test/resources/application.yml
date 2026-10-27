@@ -1,0 +1,26 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:pronto;MODE=MySQL;DATABASE_TO_LOWER=TRUE;LOCK_TIMEOUT=10000;DB_CLOSE_DELAY=-1
+    username: sa
+    password: ""
+
+  flyway:
+    locations: classpath:db/migration,classpath:db/sample
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+        type:
+          preferred_instant_jdbc_type: TIMESTAMP
+
+logging:
+  pattern:
+    level: "%5p [%X{requestId:-}]"
+  level:
+    # preferred_instant_jdbc_type is flagged "incubating" on every boot; the setting is intended.
+    org.hibernate.orm.incubating: ERROR
