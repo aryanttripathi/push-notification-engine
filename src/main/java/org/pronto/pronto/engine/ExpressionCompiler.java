@@ -6,8 +6,10 @@ import org.pronto.pronto.exception.InvalidRuleException;
 import org.springframework.expression.EvaluationContext;
 import org.springframework.expression.EvaluationException;
 import org.springframework.expression.Expression;
-import org.springframework.expression.ExpressionParser;
 import org.springframework.expression.MethodResolver;
+import org.springframework.expression.spel.SpelNode;
+import org.springframework.expression.spel.ast.OperatorMatches;
+import org.springframework.expression.spel.standard.SpelExpression;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
 import org.springframework.expression.spel.support.DataBindingMethodResolver;
 import org.springframework.expression.spel.support.SimpleEvaluationContext;
@@ -21,12 +23,14 @@ import java.util.concurrent.ConcurrentHashMap;
  * Parses and evaluates rule expressions in the SpEL sandbox. Rules are untrusted input, so evaluation always
  * uses {@link SimpleEvaluationContext} (no T(), new, bean refs, assignment or getClass()), and only the
  * allowlisted instance methods resolve, so a rule can't burn memory or CPU (repeat, replaceAll, ...).
+ * The {@code matches} regex operator is rejected at parse time (ReDoS).
  * Never use StandardEvaluationContext here.
  */
 @Component
 public class ExpressionCompiler {
 
     public static final int MAX_EXPRESSION_LENGTH = 1000;
+    public static final String MATCHES_NOT_ALLOWED = "regex operator 'matches' is not allowed";
     public static final Set<String> ALLOWED_METHODS = Set.of("contains", "containsKey", "startsWith", "endsWith",
             "equals", "equalsIgnoreCase", "isEmpty", "size", "length", "toLowerCase", "toUpperCase", "trim");
 
@@ -35,13 +39,13 @@ public class ExpressionCompiler {
     private static final MethodResolver ALLOWLISTED_METHODS = (context, target, name, argumentTypes) ->
             ALLOWED_METHODS.contains(name) ? DATA_BINDING_METHODS.resolve(context, target, name, argumentTypes) : null;
 
-    private final ExpressionParser parser = new SpelExpressionParser();
+    private final SpelExpressionParser parser = new SpelExpressionParser();
     // ponytail: unbounded, one entry per distinct expression text; add a bound only if rules churn heavily.
     private final Map<String, Expression> cache = new ConcurrentHashMap<>();
 
     /** Keyed by expression text, so an edit (or a rolled-back edit) can never serve a stale expression. */
     public Expression compile(Rule rule) {
-        return cache.computeIfAbsent(rule.getExpression(), parser::parseExpression);
+        return cache.computeIfAbsent(rule.getExpression(), this::parse);
     }
 
     /** Parses the expression and dry-runs it on stub facts; it must return a Boolean. */
@@ -54,7 +58,7 @@ public class ExpressionCompiler {
         }
         Object result;
         try {
-            result = evaluate(parser.parseExpression(expression), NotificationFacts.stub());
+            result = evaluate(parse(expression), NotificationFacts.stub());
         } catch (RuntimeException e) {
             throw new InvalidRuleException(e.getMessage());
         }
@@ -70,6 +74,27 @@ public class ExpressionCompiler {
             return matched;
         }
         throw new EvaluationException("expression must return a boolean, got " + typeOf(result));
+    }
+
+    /** Used for both validation and runtime, so a rule inserted straight into the DB can't use it either. */
+    private Expression parse(String expression) {
+        SpelExpression parsed = parser.parseRaw(expression);
+        if (usesMatchesOperator(parsed.getAST())) {
+            throw new InvalidRuleException(MATCHES_NOT_ALLOWED);
+        }
+        return parsed;
+    }
+
+    private static boolean usesMatchesOperator(SpelNode node) {
+        if (node instanceof OperatorMatches) {
+            return true;
+        }
+        for (int i = 0; i < node.getChildCount(); i++) {
+            if (usesMatchesOperator(node.getChild(i))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static Object evaluate(Expression expression, NotificationFacts facts) {

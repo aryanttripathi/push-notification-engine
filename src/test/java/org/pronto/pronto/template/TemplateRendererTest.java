@@ -55,6 +55,16 @@ class TemplateRendererTest {
     }
 
     @Test
+    void deepLinkValuesArePercentEncodedButTitleAndBodyStayRaw() {
+        RenderedMessage message = renderer.render(template("#{{order_id}}", "Order {{order_id}}", "app://o/{{order_id}}"),
+                user("Bengaluru"), Map.of("order_id", "1/../settings"));
+
+        assertThat(message.getDeepLink()).isEqualTo("app://o/1%2F..%2Fsettings");
+        assertThat(message.getTitle()).isEqualTo("#1/../settings");
+        assertThat(message.getBody()).isEqualTo("Order 1/../settings");
+    }
+
+    @Test
     void renderedTextOverColumnLimitIsRejected() {
         assertThatThrownBy(() -> renderer.render(template("t", "Order {{order_id}}", null),
                 user("Bengaluru"), Map.of("order_id", "x".repeat(2000))))

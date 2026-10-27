@@ -100,6 +100,34 @@ class RuleControllerTest {
     }
 
     @Test
+    void systemRuleNameAndActionAreLockedButDescriptionCanChange() throws Exception {
+        String expression = "localHour >= 22 or localHour < 8";
+        long id = ruleRepository.findByName("QUIET_HOURS").orElseThrow().getId();
+        send(put(RULES + "/" + id), body("QUIET_HOURS_OFF", 10, expression, true, 0L))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("SYSTEM_RULE_IMMUTABLE_FIELD"));
+        Map<String, Object> allow = body("QUIET_HOURS", 10, expression, true, 0L);
+        allow.put("action", "ALLOW");
+        send(put(RULES + "/" + id), allow)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("SYSTEM_RULE_IMMUTABLE_FIELD"));
+
+        Map<String, Object> described = body("QUIET_HOURS", 11, expression, true, 0L);
+        described.put("description", "edited");
+        send(put(RULES + "/" + id), described)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.description").value("edited"))
+                .andExpect(jsonPath("$.priority").value(11));
+    }
+
+    @Test
+    void existingRuleNameIsAConflict() throws Exception {
+        send(post(RULES), body("QUIET_HOURS", 99, "false", true, null))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("CONFLICT"));
+    }
+
+    @Test
     void staleVersionIsRejected() throws Exception {
         long id = idOf(send(post(RULES), body("VERSIONED", 99, "false", true, null)));
         send(put(RULES + "/" + id), body("VERSIONED", 98, "false", true, 0L))

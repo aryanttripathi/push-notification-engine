@@ -15,6 +15,7 @@ async function api(method, url, body) {
   }
   if (!response.ok) {
     const error = new Error((data && data.message) || response.status + ' ' + response.statusText);
+    error.status = response.status;
     error.data = data || {};
     throw error;
   }

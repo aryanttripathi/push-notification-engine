@@ -21,12 +21,12 @@ mvn spring-boot:run
 |---|---|
 | http://localhost:8080/dashboard | Rules: list, create, edit, enable/disable, delete |
 | http://localhost:8080/dashboard/templates | Templates with the variables callers must send, plus a create form |
-| http://localhost:8080/demo | **Run scenario**: a 15-step scripted walk-through with expected vs actual for each step. It assumes only the system rules are active: a custom rule that matches the demo user changes the outcomes |
-| http://localhost:8080/h2-console | DB browser. JDBC URL `jdbc:h2:file:./data/pronto;MODE=MySQL;DATABASE_TO_LOWER=TRUE;AUTO_SERVER=TRUE`, user `sa`, empty password |
+| http://localhost:8080/demo | **Run scenario**: a 15-step scripted walk-through with expected vs actual for each step. Default profile only (`pronto.demo.enabled`). It assumes only the system rules are active: a custom rule that matches the demo user changes the outcomes |
+| http://localhost:8080/h2-console | DB browser. JDBC URL `jdbc:h2:file:./data/pronto;MODE=MySQL;DATABASE_TO_LOWER=TRUE;AUTO_SERVER=TRUE;LOCK_TIMEOUT=10000`, user `sa`, empty password |
 | http://localhost:8080/health | Liveness plus a DB check |
 
 - The H2 console is for local development only. It is enabled only in the default profile and accepts only localhost connections.
-- Logs go to the console and to `logs/pronto.log` (rolling, 10MB × 7). Every line carries the request id; send `X-Request-Id` to set your own.
+- Logs go to the console and to `logs/pronto.log` (rolling, 10MB × 7). Every line carries the request id. Send `X-Request-Id` (`[A-Za-z0-9._-]`, up to 64 chars) to set your own; anything else is replaced with a UUID.
 - Data lives in `./data/`. Delete that folder to start fresh.
 
 Sample data includes users `1` (Aryant, Asia/Kolkata) and `2` (Maya, America/New_York), and the templates `ORDER_SHIPPED`, `ORDER_DELIVERED`, `DIWALI_OFFER`, `FLASH_SALE`, `WEEKEND_DEALS` and `NEW_ARRIVALS`.
@@ -95,16 +95,16 @@ Other endpoints:
 |---|---|---|
 | GET | `/api/v1/notifications/decisions?userId=1&limit=50` | Audit log, newest first |
 | GET | `/api/v1/notifications/sent?userId=1&limit=50` | Sent messages, newest first |
-| GET / PUT / DELETE | `/api/v1/rules/{id}` | PUT needs the current `version` (a stale one returns 409). System rules can't be deleted or disabled (409), but their expression and priority can be edited |
-| GET / POST | `/api/v1/users`, `/api/v1/campaigns`, `/api/v1/templates` | Catalog setup; `timezone` must be an IANA id |
-| POST | `/api/v1/demo/run` | Runs the scripted scenario |
+| GET / PUT / DELETE | `/api/v1/rules/{id}` | PUT needs the current `version` (a stale one returns 409). System rules: expression, priority and description are editable; name, action and enabled are locked (409); they can't be deleted (409) |
+| GET / POST | `/api/v1/users`, `/api/v1/campaigns`, `/api/v1/templates` | Catalog setup. Users need a `city` and an IANA region `timezone` such as `Asia/Kolkata` (`+05:30`, `UTC+5` and `IST` are rejected). Template `deepLink` must start with `app://` or `https://` |
+| POST | `/api/v1/demo/run` | Runs the scripted scenario (default profile only; 404 when disabled) |
 | GET | `/api/v1/demo/data` | All tables; decisions and notifications are capped at the last 100 |
 
 Errors are always `{code, message, details?, missing?}`.
 
 ## Rule cookbook
 
-Rules apply to MARKETING messages only. They are evaluated in ascending `priority`, and the first `true` decides (`BLOCK` or `ALLOW`). If no rule matches, the message is allowed. A rule that throws **blocks** (`RULE_ERROR`), so a broken rule can't cause spam. Seeded system rules:
+Rules apply to MARKETING messages only. They are evaluated in ascending `priority`, and the first `true` decides (`BLOCK` or `ALLOW`). If no rule matches, the message is allowed. A rule that throws **blocks** (`RULE_ERROR`, stored in the audit log), so a broken rule can't cause spam. A database error is not a rule error: the request fails with 500 and nothing is stored. Seeded system rules (expression, priority and description are editable; name, action and enabled are locked; they can't be deleted):
 
 | priority | name | expression |
 |---|---|---|
@@ -140,7 +140,11 @@ BLOCK  priority 25  localDayOfWeek == 'SUNDAY' and message.campaignCode == 'WEEK
 - `variables['name']?.length()` uses safe navigation.
 - An unguarded `variables['name'].length() > 3` fails the dry-run and is rejected with 400.
 
-**Sandbox.** Expressions run in `SimpleEvaluationContext`, so there is no `T(...)`, no `new`, no bean references and no assignment. Only these methods resolve: `contains`, `containsKey`, `startsWith`, `endsWith`, `equals`, `equalsIgnoreCase`, `isEmpty`, `size`, `length`, `toLowerCase`, `toUpperCase` and `trim`. Expressions are capped at 1000 characters.
+**Sandbox.** Expressions run in a read-only `SimpleEvaluationContext`, so there is no `T(...)`, no `new`, no bean references and no assignment.
+
+- Method calls go through an allowlist resolver: only `contains`, `containsKey`, `startsWith`, `endsWith`, `equals`, `equalsIgnoreCase`, `isEmpty`, `size`, `length`, `toLowerCase`, `toUpperCase` and `trim` resolve. Anything else (`repeat`, `replaceAll`, `matches()`, `split`, `getClass`) fails, both at validation and at runtime.
+- The `matches` regex **operator** is rejected when the rule is parsed (no ReDoS).
+- Expressions are capped at 1000 characters.
 
 ## Template variables
 
@@ -153,6 +157,7 @@ Write `{{name}}` in the title, body or deep link (`{{ name }}` with spaces also 
 
 - Any placeholder without a value returns 400 `MISSING_TEMPLATE_VARIABLE`, before any rule runs.
 - A rendered text longer than its column returns 400 `RENDERED_MESSAGE_TOO_LONG`. It is never silently truncated.
+- In the deep link, each value is percent-encoded, so `1/../settings` stays one path segment (`1%2F..%2Fsettings`). Title and body are inserted as-is.
 - Output is plain text. Pages display it with `textContent`.
 
 ## Production: the `mysql` profile
@@ -166,7 +171,7 @@ mvn spring-boot:run -Dspring-boot.run.profiles=mysql
 ```
 
 - Flyway applies the schema and the system rules only. Sample users and templates are not loaded, so create them through the API.
-- `/demo` uses the sample templates and assumes only the system rules are active, so it is meant for the default profile.
+- The demo is off (`pronto.demo.enabled: false`): `/api/v1/demo/*` returns 404 and `/demo` says it is disabled.
 - The H2 console is off.
 - Timestamps are stored as UTC `DATETIME(6)`.
 

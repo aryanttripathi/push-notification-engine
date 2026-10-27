@@ -54,8 +54,10 @@ classDiagram
 
 ## Expression sandbox (security-critical)
 
-- `SimpleEvaluationContext.forReadOnlyDataBinding().withInstanceMethods().withRootObject(facts)`. **Never** `StandardEvaluationContext`.
-- It blocks `T(...)`, `new`, `@bean`, assignment. `DataBindingMethodResolver` refuses `Object`/`Class`/`ClassLoader` methods, so `getClass()` is blocked. Allowed: `{1,2}.contains(user.hubId)`, `user.city.startsWith('BLR')`.
+- `SimpleEvaluationContext.forReadOnlyDataBinding().withMethodResolvers(allowlist).withRootObject(facts)`. **Never** `StandardEvaluationContext`.
+- The allowlist resolver wraps `DataBindingMethodResolver.forInstanceMethodInvocation()` and only resolves `contains`, `containsKey`, `startsWith`, `endsWith`, `equals`, `equalsIgnoreCase`, `isEmpty`, `size`, `length`, `toLowerCase`, `toUpperCase` and `trim`. Every other method (`repeat`, `replaceAll`, `matches()`, `split`, `getClass()`) fails to resolve, at validation and at runtime.
+- The `matches` regex operator is rejected at parse time by walking the AST (validation and runtime).
+- It blocks `T(...)`, `new`, `@bean`, assignment. Allowed: `{1,2}.contains(user.hubId)` (`hubId` is an Integer), `user.city.startsWith('BLR')`.
 - Root = `NotificationFacts`. Only plain values and fact getters. No JPA entities or repositories are reachable.
 - Max expression length 1000. `validate(expr)` parses it, then evaluates it against stub facts (no DB, empty `variables`). The result must be `Boolean`, otherwise → 400 with the SpEL message.
 - Optional variables must be null-guarded. This forces rule authors to handle a missing variable:

@@ -51,6 +51,16 @@ class ExpressionCompilerTest {
     }
 
     @Test
+    void rejectsTheMatchesRegexOperatorAnywhereInTheExpression() {
+        for (String expression : new String[] {"variables['x'] matches 'a'",
+            "localHour > 1 and (variables['x'] != null and variables['x'] matches '(a+)+b')"}) {
+            assertThatThrownBy(() -> compiler.validate(expression)).as(expression)
+                    .isInstanceOf(InvalidRuleException.class)
+                    .hasMessage(ExpressionCompiler.MATCHES_NOT_ALLOWED);
+        }
+    }
+
+    @Test
     void rejectsNonBooleanSyntaxErrorsUnguardedVariablesAndOversizedInput() {
         String[] invalid = {"localHour + 1", "localHour >", "variables['x'].length() > 1", "", "true or ".repeat(200)};
         for (String expression : invalid) {

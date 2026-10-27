@@ -6,12 +6,15 @@ import org.pronto.pronto.entity.User;
 import org.pronto.pronto.exception.BadRequestException;
 import org.pronto.pronto.exception.MissingTemplateVariableException;
 import org.springframework.stereotype.Component;
+import org.springframework.web.util.UriUtils;
 
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.UnaryOperator;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -40,9 +43,10 @@ public class TemplateRenderer {
             throw new MissingTemplateVariableException(missing);
         }
         RenderedMessage message = RenderedMessage.builder()
-                .title(fill(template.getTitle(), values))
-                .body(fill(template.getBody(), values))
-                .deepLink(fill(template.getDeepLink(), values))
+                .title(fill(template.getTitle(), values, UnaryOperator.identity()))
+                .body(fill(template.getBody(), values, UnaryOperator.identity()))
+                // Each value stays inside its URL segment: "1/../settings" can't redirect the link.
+                .deepLink(fill(template.getDeepLink(), values, value -> UriUtils.encode(value, StandardCharsets.UTF_8)))
                 .build();
         checkLength("title", message.getTitle(), MAX_TITLE);
         checkLength("body", message.getBody(), MAX_BODY);
@@ -75,11 +79,12 @@ public class TemplateRenderer {
         return values;
     }
 
-    private static String fill(String text, Map<String, String> values) {
+    private static String fill(String text, Map<String, String> values, UnaryOperator<String> encode) {
         if (text == null) {
             return null;
         }
-        return PLACEHOLDER.matcher(text).replaceAll(match -> Matcher.quoteReplacement(values.get(match.group(1))));
+        return PLACEHOLDER.matcher(text)
+                .replaceAll(match -> Matcher.quoteReplacement(encode.apply(values.get(match.group(1)))));
     }
 
     private static void checkLength(String field, String text, int max) {

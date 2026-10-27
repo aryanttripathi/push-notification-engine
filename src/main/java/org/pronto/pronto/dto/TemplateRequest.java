@@ -2,6 +2,7 @@ package org.pronto.pronto.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 import org.pronto.pronto.entity.MessageType;
@@ -28,6 +29,8 @@ public class TemplateRequest {
     @Size(max = 1000)
     private String body;
 
+    /** app:// or https:// only, so no javascript: links; placeholders like {{order_id}} are allowed. */
     @Size(max = 500)
+    @Pattern(regexp = "^(app|https)://\\S+$", message = "must start with app:// or https:// and contain no spaces")
     private String deepLink;
 }

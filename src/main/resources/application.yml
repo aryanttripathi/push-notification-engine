@@ -44,3 +44,8 @@ logging:
   level:
     # preferred_instant_jdbc_type is flagged "incubating" on every boot; the setting is intended.
     org.hibernate.orm.incubating: ERROR
+
+pronto:
+  demo:
+    # /demo and /api/v1/demo/*: creates demo users and rules, so never in production.
+    enabled: true

@@ -23,7 +23,6 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.DateTimeException;
 import java.time.ZoneId;
 import java.util.List;
 
@@ -52,7 +51,7 @@ public class CatalogService {
         User user = new User();
         user.setName(request.getName());
         user.setTimezone(validZone(request.getTimezone()));
-        user.setCity(StringUtils.trimToNull(request.getCity()));
+        user.setCity(StringUtils.trim(request.getCity()));
         user.setHubId(request.getHubId() == null ? null : request.getHubId().longValue());
         user.setOrderCount(request.getOrderCount());
         User saved = userRepository.save(user);
@@ -110,12 +109,13 @@ public class CatalogService {
                 .orElseThrow(() -> new NotFoundException("campaign " + code + " not found"));
     }
 
+    /** IANA region ids only (Asia/Kolkata); offsets and abbreviations like +05:30 or IST are rejected. */
     private static String validZone(String timezone) {
-        try {
-            return ZoneId.of(timezone).getId();
-        } catch (DateTimeException e) {
-            throw new BadRequestException(INVALID_TIMEZONE, "unknown timezone " + timezone + ", use an IANA id");
+        if (!ZoneId.getAvailableZoneIds().contains(timezone)) {
+            throw new BadRequestException(INVALID_TIMEZONE,
+                    "unknown timezone " + timezone + ", use an IANA region id such as Asia/Kolkata");
         }
+        return timezone;
     }
 
     private static UserResponse toResponse(User user) {

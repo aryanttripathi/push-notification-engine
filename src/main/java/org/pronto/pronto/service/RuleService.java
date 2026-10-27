@@ -2,6 +2,7 @@ package org.pronto.pronto.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.pronto.pronto.dto.RuleRequest;
 import org.pronto.pronto.dto.RuleResponse;
 import org.pronto.pronto.dto.ValidateResponse;
@@ -25,6 +26,7 @@ public class RuleService {
 
     public static final String SYSTEM_RULE_CANNOT_BE_DISABLED = "SYSTEM_RULE_CANNOT_BE_DISABLED";
     public static final String SYSTEM_RULE_CANNOT_BE_DELETED = "SYSTEM_RULE_CANNOT_BE_DELETED";
+    public static final String SYSTEM_RULE_IMMUTABLE_FIELD = "SYSTEM_RULE_IMMUTABLE_FIELD";
 
     private final RuleRepository ruleRepository;
     private final ExpressionCompiler expressionCompiler;
@@ -58,10 +60,8 @@ public class RuleService {
             throw new ConflictException("rule " + id + " is at version " + rule.getVersion()
                     + " but the request has version " + request.getVersion() + "; reload and retry");
         }
-        if (rule.isSystemRule() && !request.isEnabled()) {
-            throw new ConflictException(SYSTEM_RULE_CANNOT_BE_DISABLED,
-                    "rule " + rule.getName() + " is a system rule: its expression and priority can change, "
-                            + "but it can't be disabled");
+        if (rule.isSystemRule()) {
+            requireSystemRuleIntact(rule, request);
         }
         expressionCompiler.validate(request.getExpression());
         requireUniqueName(request.getName(), id);
@@ -94,6 +94,18 @@ public class RuleService {
 
     private Rule load(Long id) {
         return ruleRepository.findById(id).orElseThrow(() -> new NotFoundException("rule " + id + " not found"));
+    }
+
+    /** System rules keep their name, action and enabled flag; expression, priority and description can change. */
+    private static void requireSystemRuleIntact(Rule rule, RuleRequest request) {
+        if (!StringUtils.equals(rule.getName(), request.getName()) || rule.getAction() != request.getAction()) {
+            throw new ConflictException(SYSTEM_RULE_IMMUTABLE_FIELD,
+                    "rule " + rule.getName() + " is a system rule: its name and action can't change");
+        }
+        if (!request.isEnabled()) {
+            throw new ConflictException(SYSTEM_RULE_CANNOT_BE_DISABLED,
+                    "rule " + rule.getName() + " is a system rule: it can't be disabled");
+        }
     }
 
     private void requireUniqueName(String name, Long ownId) {

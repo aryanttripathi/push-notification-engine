@@ -10,3 +10,7 @@ spring:
 
   flyway:
     locations: classpath:db/migration
+
+pronto:
+  demo:
+    enabled: false

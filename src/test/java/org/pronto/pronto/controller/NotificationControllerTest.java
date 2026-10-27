@@ -68,9 +68,10 @@ class NotificationControllerTest {
     void requestIdIsHonoredWhenSafeAndReplacedOtherwise() throws Exception {
         mockMvc.perform(get("/health").header("X-Request-Id", "abc-123"))
                 .andExpect(header().string("X-Request-Id", "abc-123"));
-        String tooLong = "x".repeat(65);
-        mockMvc.perform(get("/health").header("X-Request-Id", tooLong))
-                .andExpect(header().string("X-Request-Id", not(tooLong)));
+        for (String unsafe : new String[] {"x".repeat(65), "abc def", "abc\nINFO forged line", "id;rm"}) {
+            mockMvc.perform(get("/health").header("X-Request-Id", unsafe))
+                    .andExpect(header().string("X-Request-Id", not(unsafe)));
+        }
     }
 
     @Test

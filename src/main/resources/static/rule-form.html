@@ -113,7 +113,7 @@
       version = rule.version;
       if (rule.systemRule) {
         field('heading').textContent = 'Edit system rule ' + rule.name;
-        field('enabled').disabled = true;
+        ['name', 'action', 'enabled'].forEach(name => { field(name).disabled = true; });
       }
     } catch (error) {
       showError(message, error);

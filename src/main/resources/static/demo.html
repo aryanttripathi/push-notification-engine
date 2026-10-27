@@ -93,7 +93,12 @@
       const data = await api('GET', '/api/v1/demo/data');
       document.getElementById('data').replaceChildren(...TABLES.map(([key, label]) => dataTable(label, data[key])));
     } catch (error) {
-      showError(message, error);
+      if (error.status === 404) {
+        runButton.disabled = true;
+        showError(message, { message: 'Demo is disabled in this profile.', data: { code: 'Unavailable' } });
+      } else {
+        showError(message, error);
+      }
     }
   }
 

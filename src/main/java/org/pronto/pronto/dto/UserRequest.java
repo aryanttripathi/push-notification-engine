@@ -17,6 +17,8 @@ public class UserRequest {
     @Size(max = 64)
     private String timezone;
 
+    /** Required: templates use {{user_city}}, and a request can't supply it. */
+    @NotBlank
     @Size(max = 64)
     private String city;
 

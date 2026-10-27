@@ -17,6 +17,7 @@ import org.pronto.pronto.entity.Decision;
 import org.pronto.pronto.entity.RuleAction;
 import org.pronto.pronto.exception.MissingTemplateVariableException;
 import org.pronto.pronto.repository.NotificationDecisionRepository;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
@@ -35,6 +36,7 @@ import java.util.Map;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@ConditionalOnProperty(name = "pronto.demo.enabled", havingValue = "true")
 public class DemoService {
 
     private static final ZoneId ZONE = ZoneId.of("Asia/Kolkata");

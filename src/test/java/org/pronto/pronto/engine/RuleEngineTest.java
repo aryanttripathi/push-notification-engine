@@ -10,14 +10,12 @@ import org.pronto.pronto.entity.User;
 import org.pronto.pronto.repository.NotificationRepository;
 import org.springframework.dao.DataAccessResourceFailureException;
 
-import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -43,21 +41,6 @@ class RuleEngineTest {
 
         assertThat(result.getDecision()).isEqualTo(Decision.BLOCKED);
         assertThat(result.getReason()).startsWith(RuleEngine.RULE_ERROR);
-    }
-
-    /** Classic catastrophic patterns finish in milliseconds (the JDK regex engine memoizes these loops). */
-    @Test
-    void catastrophicRegexFinishesQuicklyWithoutMatching() {
-        for (String pattern : new String[] {"(a+)+b", "(a|a)+b", "(a|aa)+b"}) {
-            String expression = "variables['x'] != null and variables['x'] matches '" + pattern + "'";
-            new ExpressionCompiler().validate(expression);
-            NotificationFacts facts = facts(Map.of("x", "a".repeat(50) + "!"), "Pune");
-
-            EvaluationResult result = assertTimeoutPreemptively(Duration.ofSeconds(5),
-                    () -> engine.evaluate(List.of(saved(expression)), facts), pattern);
-
-            assertThat(result.getTrace()).singleElement().satisfies(trace -> assertThat(trace.isMatched()).isFalse());
-        }
     }
 
     private static Rule saved(String expression) {

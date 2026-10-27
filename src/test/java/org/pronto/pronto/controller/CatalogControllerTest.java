@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.Map;
 
 import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -53,9 +54,18 @@ class CatalogControllerTest {
 
     @Test
     void rejectsBadTimezoneUnknownCampaignDuplicatesAndMissingFields() throws Exception {
-        post("/api/v1/users", Map.of("name", "Ravi", "timezone", "Mars/Olympus"))
+        for (String timezone : new String[] {"Mars/Olympus", "+05:30", "UTC+5", "IST"}) {
+            post("/api/v1/users", Map.of("name", "Ravi", "timezone", timezone, "city", "Pune"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("INVALID_TIMEZONE"));
+        }
+        post("/api/v1/users", Map.of("name", "Ravi", "timezone", "Asia/Kolkata"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("INVALID_TIMEZONE"));
+                .andExpect(jsonPath("$.details[0]").value("city: must not be blank"));
+        post("/api/v1/templates", Map.of("code", "X3", "type", "MARKETING", "title", "t", "body", "b",
+                "deepLink", "javascript:alert(1)"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.details[0]").value(startsWith("deepLink:")));
         post("/api/v1/templates", Map.of("code", "X1", "type", "MARKETING", "campaignCode", "NOPE",
                 "title", "t", "body", "b"))
                 .andExpect(status().isNotFound());

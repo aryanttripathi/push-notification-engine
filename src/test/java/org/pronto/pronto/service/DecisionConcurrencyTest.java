@@ -13,6 +13,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
@@ -52,10 +53,10 @@ class DecisionConcurrencyTest {
         User user = userRepository.save(user(KOLKATA));
         Instant noon = at(DAY, "12:00", KOLKATA);
 
-        List<Decision> decisions = inParallel(
+        List<DecisionResponse> responses = inParallel(
                 () -> decisionService.decide(request(user.getId(), "NEW_ARRIVALS", Map.of()), noon));
 
-        assertCapHeld(user, decisions);
+        assertCapHeld(user, decisionsOf(responses));
     }
 
     /** API path: every clock read is later than the previous one, as on a real server. */
@@ -66,10 +67,13 @@ class DecisionConcurrencyTest {
         AtomicLong ticks = new AtomicLong();
         when(clock.instant()).thenAnswer(invocation -> noon.plusMillis(ticks.incrementAndGet()));
 
-        List<Decision> decisions = inParallel(
+        List<DecisionResponse> responses = inParallel(
                 () -> decisionService.decide(request(user.getId(), "NEW_ARRIVALS", Map.of())));
 
-        assertCapHeld(user, decisions);
+        assertCapHeld(user, decisionsOf(responses));
+        // "now" is read after the lock, so later-locked (higher id) decisions never carry an earlier time.
+        assertThat(responses.stream().sorted(Comparator.comparing(DecisionResponse::getDecisionId))
+                .map(DecisionResponse::getDecidedAt).toList()).isSorted();
     }
 
     private void assertCapHeld(User user, List<Decision> decisions) {
@@ -78,7 +82,11 @@ class DecisionConcurrencyTest {
         assertThat(notificationRepository.countByUser_Id(user.getId())).isEqualTo(DAILY_CAP);
     }
 
-    private static List<Decision> inParallel(Callable<DecisionResponse> decide) throws Exception {
+    private static List<Decision> decisionsOf(List<DecisionResponse> responses) {
+        return responses.stream().map(DecisionResponse::getDecision).toList();
+    }
+
+    private static List<DecisionResponse> inParallel(Callable<DecisionResponse> decide) throws Exception {
         CountDownLatch start = new CountDownLatch(1);
         ExecutorService pool = Executors.newFixedThreadPool(THREADS);
         try {
@@ -90,11 +98,11 @@ class DecisionConcurrencyTest {
                 }));
             }
             start.countDown();
-            List<Decision> decisions = new ArrayList<>();
+            List<DecisionResponse> responses = new ArrayList<>();
             for (Future<DecisionResponse> future : futures) {
-                decisions.add(future.get(30, TimeUnit.SECONDS).getDecision());
+                responses.add(future.get(30, TimeUnit.SECONDS));
             }
-            return decisions;
+            return responses;
         } finally {
             pool.shutdownNow();
         }

@@ -13,6 +13,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 /** Puts a request id in the MDC (every log line) and echoes it in the response header. */
 @Component
@@ -21,7 +22,8 @@ public class RequestIdFilter extends OncePerRequestFilter {
 
     public static final String HEADER = "X-Request-Id";
     public static final String MDC_KEY = "requestId";
-    private static final int MAX_LENGTH = 64;
+    /** Ids end up in every log line: anything else (spaces, newlines, quotes) is replaced, so logs can't be forged. */
+    private static final Pattern SAFE_ID = Pattern.compile("[A-Za-z0-9._-]{1,64}");
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
@@ -38,9 +40,7 @@ public class RequestIdFilter extends OncePerRequestFilter {
 
     private static String requestIdOf(HttpServletRequest request) {
         String incoming = request.getHeader(HEADER);
-        // Only safe, short ids are trusted: they end up in every log line.
-        if (StringUtils.isNotBlank(incoming) && StringUtils.length(incoming) <= MAX_LENGTH
-                && StringUtils.isAsciiPrintable(incoming)) {
+        if (StringUtils.isNotEmpty(incoming) && SAFE_ID.matcher(incoming).matches()) {
             return incoming;
         }
         return UUID.randomUUID().toString();
