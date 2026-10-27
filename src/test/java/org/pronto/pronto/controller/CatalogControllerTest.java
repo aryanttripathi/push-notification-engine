@@ -61,6 +61,7 @@ class CatalogControllerTest {
         }
         post("/api/v1/users", Map.of("name", "Ravi", "timezone", "Asia/Kolkata"))
                 .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("request validation failed"))
                 .andExpect(jsonPath("$.details[0]").value("city: must not be blank"));
         post("/api/v1/templates", Map.of("code", "X3", "type", "MARKETING", "title", "t", "body", "b",
                 "deepLink", "javascript:alert(1)"))

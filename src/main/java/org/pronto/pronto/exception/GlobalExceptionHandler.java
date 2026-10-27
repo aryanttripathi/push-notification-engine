@@ -29,6 +29,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     private static final String INVALID_RULE = "INVALID_RULE";
     private static final String MISSING_TEMPLATE_VARIABLE = "MISSING_TEMPLATE_VARIABLE";
     private static final String INTERNAL_ERROR = "INTERNAL_ERROR";
+    private static final String VALIDATION_FAILED = "request validation failed";
 
     @ExceptionHandler(NotFoundException.class)
     public ResponseEntity<ErrorResponse> notFound(NotFoundException e) {
@@ -83,10 +84,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     protected ResponseEntity<Object> handleExceptionInternal(Exception ex, Object body, HttpHeaders headers,
                                                              HttpStatusCode status, WebRequest request) {
         HttpStatus resolved = HttpStatus.resolve(status.value());
+        List<String> details = detailsOf(ex);
+        String message = body instanceof ProblemDetail problem ? problem.getDetail() : ex.getMessage();
         ErrorResponse error = ErrorResponse.builder()
                 .code(resolved == null ? String.valueOf(status.value()) : resolved.name())
-                .message(body instanceof ProblemDetail problem ? problem.getDetail() : ex.getMessage())
-                .details(detailsOf(ex))
+                // field errors are in details; the raw exception message leaks Java signatures
+                .message(details == null ? message : VALIDATION_FAILED)
+                .details(details)
                 .build();
         log.warn("request rejected status={} code={} message={}", status.value(), error.getCode(), error.getMessage());
         return super.handleExceptionInternal(ex, error, headers, status, request);
