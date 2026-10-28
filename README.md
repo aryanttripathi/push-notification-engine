@@ -7,6 +7,8 @@ Upstream services ask *"may I send template X to user Y?"*. Pronto runs the rule
 - Rules live in the DB as sandboxed SpEL and are edited at runtime from `/dashboard`, with no deploy.
 - Every attempt is audited with its rule trace, and every sent message is stored with its exact rendered text.
 
+**Try it in 15 minutes: [Demo & Test Guide](docs/DEMO_GUIDE.md)**. It walks through the dashboard, templates, `/demo`, a curl test for every rule, SQL to inspect each table, and how the parts are wired.
+
 Design docs: [HLD](docs/HLD.md), [LLD](docs/LLD.md), [DB schema](docs/DB_SCHEMA.md), [coding guidelines](docs/CODING_GUIDELINES.md), [plan](docs/PLAN.md).
 
 ## Quick start
