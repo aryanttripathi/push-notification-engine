@@ -15,7 +15,7 @@ Acceptance bar on a fresh clone with no DB installed: `mvn verify` passes, and `
 | **2 Engine + decide API** | `ExpressionCompiler`, `NotificationFacts`, `RuleEngine`, `TemplateRenderer`, `DecisionService`, `NotificationController`, `GlobalExceptionHandler` | tests below green |
 | **3 Rules/catalog API + dashboard** | `RuleService`, `RuleController`, `CatalogService/Controller`, `/dashboard`, `/dashboard/new`, `/dashboard/templates` | tests below green; UI create/edit/toggle/delete works |
 | **4 Demo + README** | `DemoService`, `DemoController`, `/demo`; README (run, API curl examples, rule cookbook, template variables, prod MySQL, "add when" list) | every `/demo` step has expected == actual; re-runnable |
-| **5 Verify + ship** | reviewer pass → coder fixes → tester E2E (H2 + MySQL profile against local MySQL) → chief clone-and-run → push public repo `aryanttripathi/<name>` | all green |
+| **5 Verify + ship** | reviewer pass → coder fixes → tester E2E (H2) → chief clone-and-run + MySQL-profile smoke test against local MySQL → push public repo `aryanttripathi/<name>` | all green |
 
 ## Required tests
 

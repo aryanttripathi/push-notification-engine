@@ -105,7 +105,7 @@ Orchestrator only. Each step is a private method of 60 lines or fewer.
 | GET | `/api/v1/notifications/decisions?userId=&limit=50` | audit log, latest first |
 | GET | `/api/v1/notifications/sent?userId=&limit=50` | sent notifications, latest first |
 | GET/POST | `/api/v1/rules` | list (priority order) / create |
-| GET/PUT/DELETE | `/api/v1/rules/{id}` | DELETE on a system rule → 409; PUT with a stale `version` → 409 |
+| GET/PUT/DELETE | `/api/v1/rules/{id}` | system rule: DELETE, disable, or a name/action change → 409 (expression, priority, description stay editable); PUT with a stale `version` → 409 |
 | POST | `/api/v1/rules/validate` | `{expression}` → `{valid, error?}` |
 | GET/POST | `/api/v1/users`, `/api/v1/campaigns`, `/api/v1/templates` | catalog setup |
 | POST | `/api/v1/demo/run` | runs the scripted scenario |

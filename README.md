@@ -174,6 +174,11 @@ mvn spring-boot:run -Dspring-boot.run.profiles=mysql
 - The demo is off (`pronto.demo.enabled: false`): `/api/v1/demo/*` returns 404 and `/demo` says it is disabled.
 - The H2 console is off.
 - Timestamps are stored as UTC `DATETIME(6)`.
+- Verified against a local MySQL 9.4 (the SQL is MySQL 8 compatible):
+  - Flyway migration and Hibernate `validate` pass, and the 3 system rules are seeded.
+  - Transactional bypass, campaign dedupe, idempotent replay and a custom rule all behave as expected.
+  - A full-size `variables` row inserts fine.
+  - 10 parallel decides for one user give exactly 3 ALLOWED (InnoDB row lock).
 
 ## Running tests
 
