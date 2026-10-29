@@ -110,6 +110,7 @@ Orchestrator only. Each step is a private method of 60 lines or fewer.
 | GET/POST | `/api/v1/users`, `/api/v1/campaigns`, `/api/v1/templates` | catalog setup |
 | POST | `/api/v1/demo/run` | runs the scripted scenario |
 | GET | `/api/v1/demo/data` | all tables (decisions/notifications: last 100) |
+| POST | `/api/v1/demo/reset` | `flyway.clean()` + `migrate()`: back to the seeded DB; returns row counts. Demo profile only |
 | GET | `/health` | existing |
 
 Errors → `{code, message, details?}`. 400 bad input / invalid rule / missing variable, 404, 409.

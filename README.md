@@ -23,7 +23,7 @@ mvn spring-boot:run
 |---|---|
 | http://localhost:8080/dashboard | Rules: list, create, edit, enable/disable, delete |
 | http://localhost:8080/dashboard/templates | Templates with the variables callers must send, plus a create form |
-| http://localhost:8080/demo | **Run scenario**: a 15-step scripted walk-through with expected vs actual for each step. Default profile only (`pronto.demo.enabled`). It assumes only the system rules are active: a custom rule that matches the demo user changes the outcomes |
+| http://localhost:8080/demo | **Run scenario**: a 15-step scripted walk-through with expected vs actual for each step. **Reset data**: back to the freshly seeded DB (Flyway `clean` + `migrate`). Default profile only (`pronto.demo.enabled`). The scenario assumes only the system rules are active; if custom or edited rules make it fail, click Reset data |
 | http://localhost:8080/h2-console | DB browser. JDBC URL `jdbc:h2:file:./data/pronto;MODE=MySQL;DATABASE_TO_LOWER=TRUE;AUTO_SERVER=TRUE;LOCK_TIMEOUT=10000`, user `sa`, empty password |
 | http://localhost:8080/health | Liveness plus a DB check |
 
@@ -101,6 +101,7 @@ Other endpoints:
 | GET / POST | `/api/v1/users`, `/api/v1/campaigns`, `/api/v1/templates` | Catalog setup. Users need a `city` and an IANA region `timezone` such as `Asia/Kolkata` (`+05:30`, `UTC+5` and `IST` are rejected). Template `deepLink` must start with `app://` or `https://` |
 | POST | `/api/v1/demo/run` | Runs the scripted scenario (default profile only; 404 when disabled) |
 | GET | `/api/v1/demo/data` | All tables; decisions and notifications are capped at the last 100 |
+| POST | `/api/v1/demo/reset` | Drops all data and re-runs the Flyway seed scripts; returns row counts (default profile only; 404 when disabled) |
 
 Errors are always `{code, message, details?, missing?}`.
 

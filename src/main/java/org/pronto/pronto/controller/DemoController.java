@@ -2,6 +2,7 @@ package org.pronto.pronto.controller;
 
 import lombok.RequiredArgsConstructor;
 import org.pronto.pronto.dto.DemoDataResponse;
+import org.pronto.pronto.dto.DemoResetResponse;
 import org.pronto.pronto.dto.DemoRunResponse;
 import org.pronto.pronto.service.DemoService;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -21,6 +22,12 @@ public class DemoController {
     @PostMapping("/run")
     public DemoRunResponse run() {
         return demoService.run();
+    }
+
+    /** Drops all data and re-seeds it, as on first boot. */
+    @PostMapping("/reset")
+    public DemoResetResponse reset() {
+        return demoService.reset();
     }
 
     @GetMapping("/data")

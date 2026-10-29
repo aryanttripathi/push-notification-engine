@@ -22,7 +22,10 @@
       <p class="muted">Creates a fresh user in Asia/Kolkata and replays two days of notifications through the real
         decision path, starting two days ago. Safe to re-run.</p>
     </div>
-    <button id="run" class="button primary">Run scenario</button>
+    <div class="form-actions">
+      <button id="reset" class="button">Reset data</button>
+      <button id="run" class="button primary">Run scenario</button>
+    </div>
   </div>
   <div id="message" class="alert error" role="alert" hidden></div>
   <div id="summary" class="summary" hidden></div>
@@ -41,11 +44,19 @@
   'use strict';
   const message = document.getElementById('message');
   const runButton = document.getElementById('run');
+  const resetButton = document.getElementById('reset');
+  const RESET_CONFIRM = 'Reset deletes all decisions, notifications, custom rules and anything you created, '
+    + 'and restores the seeded data. Continue?';
   const TABLES = [['users', 'Users'], ['campaigns', 'Campaigns'], ['templates', 'Templates'], ['rules', 'Rules'],
     ['decisions', 'Decisions (last 100)'], ['notifications', 'Sent notifications (last 100)']];
 
+  function setBusy(busy) {
+    runButton.disabled = busy;
+    resetButton.disabled = busy;
+  }
+
   runButton.addEventListener('click', async () => {
-    runButton.disabled = true;
+    setBusy(true);
     hideMessage(message);
     try {
       showRun(await api('POST', '/api/v1/demo/run'));
@@ -53,7 +64,25 @@
     } catch (error) {
       showError(message, error);
     } finally {
-      runButton.disabled = false;
+      setBusy(false);
+    }
+  });
+
+  resetButton.addEventListener('click', async () => {
+    if (!confirm(RESET_CONFIRM)) return;
+    setBusy(true);
+    hideMessage(message);
+    try {
+      const c = await api('POST', '/api/v1/demo/reset');
+      document.getElementById('summary').hidden = true;
+      document.getElementById('steps-wrap').hidden = true;
+      showOk(message, 'Reset done: ' + c.rules + ' rules, ' + c.users + ' users, ' + c.campaigns + ' campaigns, '
+        + c.templates + ' templates, ' + c.decisions + ' decisions, ' + c.notifications + ' notifications.');
+      await loadData();
+    } catch (error) {
+      showError(message, error);
+    } finally {
+      setBusy(false);
     }
   });
 
@@ -94,7 +123,7 @@
       document.getElementById('data').replaceChildren(...TABLES.map(([key, label]) => dataTable(label, data[key])));
     } catch (error) {
       if (error.status === 404) {
-        runButton.disabled = true;
+        setBusy(true);
         showError(message, { message: 'Demo is disabled in this profile.', data: { code: 'Unavailable' } });
       } else {
         showError(message, error);

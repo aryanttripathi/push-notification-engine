@@ -10,6 +10,8 @@ spring:
 
   flyway:
     locations: classpath:db/migration
+    # Never let anything wipe the production schema (the demo reset is also disabled here).
+    clean-disabled: true
 
 pronto:
   demo:

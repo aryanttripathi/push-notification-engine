@@ -6,6 +6,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.pronto.pronto.dto.DecideRequest;
 import org.pronto.pronto.dto.DecisionResponse;
 import org.pronto.pronto.dto.DemoDataResponse;
+import org.pronto.pronto.dto.DemoResetResponse;
 import org.pronto.pronto.dto.DemoRunResponse;
 import org.pronto.pronto.dto.DemoStep;
 import org.pronto.pronto.dto.RuleRequest;
@@ -17,6 +18,7 @@ import org.pronto.pronto.entity.Decision;
 import org.pronto.pronto.entity.RuleAction;
 import org.pronto.pronto.exception.MissingTemplateVariableException;
 import org.pronto.pronto.repository.NotificationDecisionRepository;
+import org.flywaydb.core.Flyway;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
@@ -54,6 +56,7 @@ public class DemoService {
     private final CatalogService catalogService;
     private final NotificationDecisionRepository decisionRepository;
     private final Clock clock;
+    private final Flyway flyway;
 
     /** One decide call of the script. */
     private record Call(int number, LocalDateTime localTime, String template, Map<String, Object> variables,
@@ -95,6 +98,28 @@ public class DemoService {
                 .decisions(decisionService.latestDecisions(RECENT_ROWS))
                 .notifications(decisionService.latestSent(RECENT_ROWS))
                 .build();
+    }
+
+    /**
+     * Back to the freshly seeded DB: Flyway drops everything and re-runs V1-V3, so this can't drift from the
+     * seed scripts. Not transactional (DDL). Only reachable when the demo is enabled, and the mysql profile
+     * also sets spring.flyway.clean-disabled.
+     */
+    public DemoResetResponse reset() {
+        flyway.clean();
+        flyway.migrate();
+        DemoDataResponse data = snapshot();
+        DemoResetResponse counts = DemoResetResponse.builder()
+                .rules(data.getRules().size())
+                .users(data.getUsers().size())
+                .campaigns(data.getCampaigns().size())
+                .templates(data.getTemplates().size())
+                .decisions(data.getDecisions().size())
+                .notifications(data.getNotifications().size())
+                .build();
+        log.warn("demo reset: database cleaned and re-seeded rules={} users={} campaigns={} templates={}",
+                counts.getRules(), counts.getUsers(), counts.getCampaigns(), counts.getTemplates());
+        return counts;
     }
 
     /** Steps 2-10: day D (two days ago, local). */

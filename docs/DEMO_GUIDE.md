@@ -41,7 +41,9 @@ On first boot, Flyway creates the schema and seeds:
 - **3 campaigns**
 - **6 templates**
 
-To start over from a clean database at any point, stop the app, delete the data and logs, and start it again:
+To start over from a clean database at any point, click **Reset data** on http://localhost:8080/demo. It deletes every decision, notification, custom rule and anything you created, and restores the seeded data, with no restart.
+
+Alternatively, stop the app, delete the data and logs, and start it again:
 
 ```bash
 rm -rf data logs
@@ -124,7 +126,7 @@ What the 15 steps prove:
 
 Below the steps, the page dumps every table: users, campaigns, templates, rules, decisions (last 100) and notifications (last 100). Click **Run scenario** again: it creates a new user and passes again.
 
-> The demo assumes the 3 system rules as seeded and no other active rules. Two things make some steps differ: a custom rule that matches the demo user (disable it first), or an edited system rule (e.g. the 48h window from 2d makes step 14 fail; set it back to 24).
+> The demo assumes the 3 system rules as seeded and no other active rules. Two things make some steps differ: a custom rule that matches the demo user, or an edited system rule (e.g. the 48h window from 2d makes step 14 fail). If that happens, click **Reset data**, then **Run scenario** again.
 
 ---
 

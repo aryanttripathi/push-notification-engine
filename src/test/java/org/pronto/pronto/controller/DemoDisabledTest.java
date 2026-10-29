@@ -22,5 +22,6 @@ class DemoDisabledTest {
     void demoApiIsAbsentWhenDisabled() throws Exception {
         mockMvc.perform(post("/api/v1/demo/run")).andExpect(status().isNotFound());
         mockMvc.perform(get("/api/v1/demo/data")).andExpect(status().isNotFound());
+        mockMvc.perform(post("/api/v1/demo/reset")).andExpect(status().isNotFound());
     }
 }

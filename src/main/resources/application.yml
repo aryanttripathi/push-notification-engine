@@ -18,6 +18,8 @@ spring:
 
   flyway:
     locations: classpath:db/migration,classpath:db/sample
+    # The /demo "Reset data" button runs flyway.clean() + migrate() on this local H2 DB.
+    clean-disabled: false
 
   jpa:
     hibernate:
